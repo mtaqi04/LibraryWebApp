@@ -1,17 +1,20 @@
-# Start with an OpenJDK base image
+# First stage: Build the app with Maven
+FROM maven:3.9.2-eclipse-temurin-17 as builder
+
+WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
+
+# Second stage: Run the app
 FROM eclipse-temurin:17-jdk-alpine
 
-# Set working directory inside the container
 WORKDIR /app
 
-# Copy all project files into the container
-COPY . .
+# Copy only the JAR from the builder stage
+COPY --from=builder /app/target/*.jar app.jar
 
-# Package the Spring Boot app using Maven
-RUN ./mvnw clean package -DskipTests
-
-# Expose the port the app runs on
+# Expose the app port
 EXPOSE 8080
 
-# Run the .jar file
-CMD ["java", "-jar", "target/*.jar"]
+# Run the jar
+ENTRYPOINT ["java", "-jar", "app.jar"]

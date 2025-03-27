@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Return Book</title>
+</head>
+<body>
+<h2>Return a Book</h2>
+<form action="/return" method="post">
+    <label for="isbn">Enter ISBN:</label>
+    <input type="text" name="isbn" id="isbn" required />
+    <button type="submit">Return</button>
+</form>
+</body>
+</html>

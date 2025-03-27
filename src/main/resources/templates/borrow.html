@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Borrow Book</title>
+</head>
+<body>
+<h2>Borrow a Book</h2>
+<form action="/borrow" method="post">
+    <label for="isbn">Enter ISBN:</label>
+    <input type="text" name="isbn" id="isbn" required />
+    <button type="submit">Borrow</button>
+</form>
+</body>
+</html>
+

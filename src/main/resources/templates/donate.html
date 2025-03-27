@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Donate Book</title>
+</head>
+<body>
+<h2>Donate a Book</h2>
+<form action="/donate" method="post">
+    <label for="isbn">ISBN:</label>
+    <input type="text" name="isbn" id="isbn" required /><br><br>
+
+    <label for="author">Author:</label>
+    <input type="text" name="author" id="author" required /><br><br>
+
+    <label for="title">Title:</label>
+    <input type="text" name="title" id="title" required /><br><br>
+
+    <button type="submit">Donate</button>
+</form>
+</body>
+</html>

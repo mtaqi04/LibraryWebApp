@@ -8,11 +8,22 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import com.library.LibraryWebApp.repository.UserRepository;
+import com.library.LibraryWebApp.repository.BookRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.List;
+
 
 import java.util.HashMap;
 
 @Controller
 public class LibraryController {
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private BookRepository bookRepository;
+
 
     // 🔐 User login state & accounts
     private final HashMap<String, String> users = new HashMap<>();
@@ -41,16 +52,14 @@ public class LibraryController {
     public String login(@RequestParam String username,
                         @RequestParam String password,
                         Model model) {
-        String storedPassword = users.get(username);
-        if (storedPassword != null && storedPassword.equals(password)) {
+        User user = userRepository.findByUsername(username);
+        if (user != null && user.getPassword().equals(password)) {
             loggedIn = true;
             currentUser = username;
-            setupBooks();  // ← Initialize book data only after login
             return "redirect:/home";
-        } else {
-            model.addAttribute("error", "Invalid username or password.");
-            return "login";
         }
+        model.addAttribute("error", "Invalid username or password.");
+        return "login";
     }
 
     @GetMapping("/signup")
@@ -62,11 +71,11 @@ public class LibraryController {
     public String signup(@RequestParam String username,
                          @RequestParam String password,
                          Model model) {
-        if (users.containsKey(username)) {
+        if (userRepository.existsById(username)) {
             model.addAttribute("error", "Username already exists.");
             return "signup";
         }
-        users.put(username, password);
+        userRepository.save(new User(username, password));
         model.addAttribute("success", "Account created! Please log in.");
         return "login";
     }
@@ -77,6 +86,14 @@ public class LibraryController {
         model.addAttribute("username", currentUser);
         return "index";
     }
+
+    @GetMapping("/books")
+    public String showAllBooks(Model model) {
+        model.addAttribute("books", bookRepository.findAll());
+        model.addAttribute("username", currentUser); // optional
+        return "books";
+    }
+
 
 
     // 📚 Book Routes
@@ -98,9 +115,11 @@ public class LibraryController {
 
     @PostMapping("/borrow")
     public String borrowBook(@RequestParam String isbn, Model model) {
-        Book book = tree.findNode(isbn);
-        if (book != null && bookAvailability.getOrDefault(book, false)) {
-            bookAvailability.put(book, false);
+        Book book = bookRepository.findById(isbn).orElse(null);
+        if (book != null && book.isAvailable()) {
+            book.setAvailable(false);
+            book.setBorrowedBy(currentUser); // ✅ Save who borrowed it
+            bookRepository.save(book);
             model.addAttribute("message", "Book borrowed: " + book.getTitle());
         } else {
             model.addAttribute("message", "Book not found or unavailable.");
@@ -108,6 +127,7 @@ public class LibraryController {
         model.addAttribute("username", currentUser);
         return "result";
     }
+
 
     @GetMapping("/return")
     public String showReturnForm(Model model) {
@@ -118,9 +138,11 @@ public class LibraryController {
 
     @PostMapping("/return")
     public String returnBook(@RequestParam String isbn, Model model) {
-        Book book = tree.findNode(isbn);
-        if (book != null && !bookAvailability.getOrDefault(book, true)) {
-            bookAvailability.put(book, true);
+        Book book = bookRepository.findById(isbn).orElse(null);
+        if (book != null && !book.isAvailable()) {
+            book.setAvailable(true);
+            book.setBorrowedBy(null); // ✅ Remove borrower
+            bookRepository.save(book);
             model.addAttribute("message", "Book returned: " + book.getTitle());
         } else {
             model.addAttribute("message", "Book not found or already returned.");
@@ -128,6 +150,19 @@ public class LibraryController {
         model.addAttribute("username", currentUser);
         return "result";
     }
+
+    @GetMapping("/mybooks")
+    public String showMyBorrowedBooks(Model model) {
+        List<Book> borrowed = bookRepository.findAll()
+                .stream()
+                .filter(book -> currentUser.equals(book.getBorrowedBy()))
+                .toList();
+
+        model.addAttribute("books", borrowed);
+        model.addAttribute("username", currentUser);
+        return "mybooks";
+    }
+
 
     @GetMapping("/donate")
     public String showDonateForm(Model model) {
@@ -143,9 +178,9 @@ public class LibraryController {
                              @RequestParam String title,
                              Model model) {
         Book book = new Book(isbn, author, title);
-        tree.addNode(book);
-        bookAvailability.put(book, true);
-        model.addAttribute("message", "Thanks for donating: " + book.getTitle());
+        book.setAvailable(true);
+        bookRepository.save(book);
+        model.addAttribute("message", "Thanks for donating: " + title);
         model.addAttribute("username", currentUser);
         return "result";
     }

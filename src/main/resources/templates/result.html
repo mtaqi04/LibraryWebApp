@@ -6,6 +6,12 @@
 </head>
 <body class="bg-light">
 
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <span class="fw-bold">👋 Welcome, <span th:text="${username}"></span>!</span>
+    <a href="/logout" class="btn btn-outline-danger">Logout</a>
+</div>
+
+
 <div class="container py-5">
     <div class="alert alert-info" th:text="${message}"></div>
     <a href="/" class="btn btn-outline-secondary mt-3">← Back to Home</a>

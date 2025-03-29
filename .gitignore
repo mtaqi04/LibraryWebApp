@@ -44,7 +44,6 @@ Thumbs.db
 
 # Environment & secrets
 .env
-application.properties  # ❗️Only if it contains secrets locally, else remove this line
 
 # Documentation or IDE metadata
 HELP.md

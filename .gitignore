@@ -43,7 +43,7 @@ build/
 Thumbs.db
 
 # Environment & secrets
-.env
+src/main/resources/.env
 
 # Documentation or IDE metadata
 HELP.md

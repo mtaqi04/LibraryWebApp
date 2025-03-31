@@ -43,7 +43,8 @@ build/
 Thumbs.db
 
 # Environment & secrets
-src/main/resources/.env
+.env
+src/main/resources/application.properties
 
 
 # Documentation or IDE metadata

@@ -1,6 +1,5 @@
 package com.library.LibraryWebApp;
 
-
 import com.library.LibraryWebApp.backend.Book;
 import com.library.LibraryWebApp.backend.BinaryTree;
 import com.library.LibraryWebApp.backend.User;
@@ -11,51 +10,52 @@ import org.springframework.web.bind.annotation.*;
 import com.library.LibraryWebApp.repository.UserRepository;
 import com.library.LibraryWebApp.repository.BookRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import jakarta.servlet.http.HttpSession;
 import java.util.List;
-
-
 import java.util.HashMap;
 
 @Controller
 public class LibraryController {
+
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
     private BookRepository bookRepository;
 
-
-    // 🔐 User login state & accounts
-    private final HashMap<String, String> users = new HashMap<>();
-    private boolean loggedIn = false;
-
-    // 📚 Book data
     private BinaryTree tree;
     private HashMap<Book, Boolean> bookAvailability;
-    private String currentUser = "";
 
-
-    // 👤 Add a default user
     @PostConstruct
     public void init() {
-        users.put("admin", "password");
+        // Add a default admin user
+        if (!userRepository.existsById("admin")) {
+            userRepository.save(new User("admin", "password"));
+        }
     }
 
-    // 🔐 Login + Signup
+    @ModelAttribute
+    public void addGlobalAttributes(HttpSession session, Model model) {
+        String currentUser = (String) session.getAttribute("currentUser");
+        if (currentUser != null) {
+            model.addAttribute("username", currentUser);
+        }
+    }
 
     @GetMapping("/")
-    public String showLoginPage(Model model) {
+    public String showLoginPage() {
         return "login";
     }
 
     @PostMapping("/login")
     public String login(@RequestParam String username,
                         @RequestParam String password,
+                        HttpSession session,
                         Model model) {
         User user = userRepository.findByUsername(username);
         if (user != null && user.getPassword().equals(password)) {
-            loggedIn = true;
-            currentUser = username;
+            session.setAttribute("currentUser", username);
             return "redirect:/home";
         }
         model.addAttribute("error", "Invalid username or password.");
@@ -80,131 +80,138 @@ public class LibraryController {
         return "login";
     }
 
+    @GetMapping("/logout")
+    public String logout(HttpSession session) {
+        session.invalidate();
+        return "redirect:/";
+    }
+
     @GetMapping("/home")
-    public String home(Model model) {
-        if (!loggedIn) return "redirect:/";
-        model.addAttribute("username", currentUser);
+    public String home(HttpSession session, Model model) {
+        if (session.getAttribute("currentUser") == null) {
+            return "redirect:/";
+        }
         return "index";
     }
 
     @GetMapping("/books")
     public String showAllBooks(Model model) {
         model.addAttribute("books", bookRepository.findAll());
-        model.addAttribute("username", currentUser); // optional
         return "books";
     }
 
-
-
-    // 📚 Book Routes
-
-    @GetMapping("/logout")
-    public String logout() {
-        loggedIn = false;
-        return "redirect:/";
-    }
-
-
     @GetMapping("/borrow")
-    public String showBorrowForm(Model model) {
-        if (!loggedIn) return "redirect:/";
-        model.addAttribute("username", currentUser);
+    public String borrowForm(HttpSession session) {
+        if (session.getAttribute("currentUser") == null) {
+            return "redirect:/";
+        }
         return "borrow";
     }
 
-
     @PostMapping("/borrow")
-    public String borrowBook(@RequestParam String isbn, Model model) {
-        Book book = bookRepository.findById(isbn).orElse(null);
-        if (book != null && book.isAvailable()) {
-            book.setAvailable(false);
-            book.setBorrowedBy(currentUser); // ✅ Save who borrowed it
-            bookRepository.save(book);
-            model.addAttribute("message", "Book borrowed: " + book.getTitle());
-        } else {
-            model.addAttribute("message", "Book not found or unavailable.");
+    public String borrowBook(@RequestParam String isbn, HttpSession session, Model model) {
+        String currentUser = (String) session.getAttribute("currentUser");
+        if (currentUser == null) {
+            return "redirect:/";
         }
+
+        Book book = bookRepository.findById(isbn).orElse(null);
+        if (book == null) {
+            model.addAttribute("message", "❌ Book not found with ISBN: " + isbn);
+            model.addAttribute("username", currentUser);
+            return "result";
+        }
+
+        if (book.getBorrowedBy() != null) {
+            model.addAttribute("message", "❌ Book is already borrowed.");
+            model.addAttribute("username", currentUser);
+            return "result";
+        }
+
+        book.setBorrowedBy(currentUser);
+        bookRepository.save(book);
+        model.addAttribute("message", "✅ Book borrowed successfully!");
         model.addAttribute("username", currentUser);
         return "result";
     }
 
 
     @GetMapping("/return")
-    public String showReturnForm(Model model) {
-        if (!loggedIn) return "redirect:/";
-        model.addAttribute("username", currentUser);
+    public String returnForm(HttpSession session) {
+        if (session.getAttribute("currentUser") == null) {
+            return "redirect:/";
+        }
         return "return";
     }
 
     @PostMapping("/return")
-    public String returnBook(@RequestParam String isbn, Model model) {
-        Book book = bookRepository.findById(isbn).orElse(null);
-        if (book != null && !book.isAvailable()) {
-            book.setAvailable(true);
-            book.setBorrowedBy(null); // ✅ Remove borrower
-            bookRepository.save(book);
-            model.addAttribute("message", "Book returned: " + book.getTitle());
-        } else {
-            model.addAttribute("message", "Book not found or already returned.");
+    public String returnBook(@RequestParam String isbn, HttpSession session, Model model) {
+        String currentUser = (String) session.getAttribute("currentUser");
+        if (currentUser == null) {
+            return "redirect:/";
         }
+
+        Book book = bookRepository.findById(isbn).orElse(null);
+        if (book == null || !currentUser.equals(book.getBorrowedBy())) {
+            model.addAttribute("message", "❌ You haven't borrowed this book.");
+            model.addAttribute("username", currentUser);
+            return "result";
+        }
+
+        book.setBorrowedBy(null);
+        bookRepository.save(book);
+        model.addAttribute("message", "✅ Book returned successfully!");
         model.addAttribute("username", currentUser);
         return "result";
     }
 
+
     @GetMapping("/mybooks")
-    public String showMyBorrowedBooks(Model model) {
+    public String showMyBorrowedBooks(HttpSession session, Model model) {
+        String currentUser = (String) session.getAttribute("currentUser");
+        if (currentUser == null) return "redirect:/";
+
+        // 🧪 Test output
+        bookRepository.findAll().forEach(book -> {
+            System.out.println(book.getTitle() + " → Borrowed by: " + book.getBorrowedBy());
+        });
+
         List<Book> borrowed = bookRepository.findAll()
                 .stream()
                 .filter(book -> currentUser.equals(book.getBorrowedBy()))
                 .toList();
 
         model.addAttribute("books", borrowed);
-        model.addAttribute("username", currentUser);
         return "mybooks";
     }
 
 
+
     @GetMapping("/donate")
-    public String showDonateForm(Model model) {
-        if (!loggedIn) return "redirect:/";
-        model.addAttribute("username", currentUser);
+    public String donateForm(HttpSession session) {
+        if (session.getAttribute("currentUser") == null) {
+            return "redirect:/";
+        }
         return "donate";
     }
 
-
     @PostMapping("/donate")
     public String donateBook(@RequestParam String isbn,
-                             @RequestParam String author,
                              @RequestParam String title,
+                             @RequestParam String author,
+                             HttpSession session,
                              Model model) {
-        Book book = new Book(isbn, author, title);
-        book.setAvailable(true);
+        String currentUser = (String) session.getAttribute("currentUser");
+        if (currentUser == null) {
+            return "redirect:/";
+        }
+
+        Book book = new Book(isbn, title, author);
         bookRepository.save(book);
-        model.addAttribute("message", "Thanks for donating: " + title);
+
+        model.addAttribute("message", "📚 Book donated successfully! Thank you!");
         model.addAttribute("username", currentUser);
         return "result";
     }
 
-    // 📚 Set up books (called after login)
-    private void setupBooks() {
-        Book book1 = new Book("9780134685991", "Joshua Bloch", "Effective Java");
-        Book book2 = new Book("9780596009205", "Kathy Sierra", "Head First Java");
-        Book book3 = new Book("9780132350884", "Robert C. Martin", "Clean Code");
-        Book book4 = new Book("9780201633610", "Erich Gamma", "Design Patterns");
-        Book book5 = new Book("9781492056355", "Brian Goetz", "Java Concurrency in Practice");
-
-        tree = new BinaryTree(book1);
-        tree.addNode(book2);
-        tree.addNode(book3);
-        tree.addNode(book4);
-        tree.addNode(book5);
-
-        bookAvailability = new HashMap<>();
-        bookAvailability.put(book1, true);
-        bookAvailability.put(book2, true);
-        bookAvailability.put(book3, true);
-        bookAvailability.put(book4, true);
-        bookAvailability.put(book5, true);
-    }
 }
-

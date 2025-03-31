@@ -1,22 +1,11 @@
 package com.library.LibraryWebApp.backend;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 
 @Entity
 public class Book {
-
-    // Inside Book.java
-    private String borrowedBy; // 🔑 Username of who borrowed the book
-
-    public String getBorrowedBy() {
-        return borrowedBy;
-    }
-
-    public void setBorrowedBy(String borrowedBy) {
-        this.borrowedBy = borrowedBy;
-    }
-
 
     @Id
     private String isbn;
@@ -25,13 +14,24 @@ public class Book {
     private String author;
     private boolean available = true;
 
+    @Column(name = "borrowed_by")
+    private String borrowedBy;
+
     public Book() {}
 
-    public Book(String isbn, String author, String title) {
+    public Book(String isbn, String title, String author) {
         this.isbn = isbn;
-        this.author = author;
         this.title = title;
+        this.author = author;
         this.available = true;
+    }
+
+    public String getBorrowedBy() {
+        return borrowedBy;
+    }
+
+    public void setBorrowedBy(String borrowedBy) {
+        this.borrowedBy = borrowedBy;
     }
 
     public boolean isAvailable() {
